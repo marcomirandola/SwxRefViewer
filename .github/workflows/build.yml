@@ -29,7 +29,7 @@ jobs:
           Copy-Item src/SwxRefViewer/bin/Release/net48/* artifacts/SwxRefViewer -Recurse
           Copy-Item README.md artifacts/SwxRefViewer
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: SwxRefViewer-${{ github.run_number }}
           path: artifacts/SwxRefViewer
