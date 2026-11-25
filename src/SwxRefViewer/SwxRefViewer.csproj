@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <!-- The SOLIDWORKS Document Manager is a 64-bit COM server. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>SwxRefViewer</AssemblyName>
+    <RootNamespace>SwxRefViewer</RootNamespace>
+    <Version>0.1.0</Version>
+    <Product>SwxRefViewer</Product>
+    <Description>Shows the file references stored in SOLIDWORKS assemblies and whether they can be resolved.</Description>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Allows building the .NET Framework app on any OS (also on the CI runner). -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SwxRefViewer/SwxRefViewer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SwxRefViewer.Tests/SwxRefViewer.Tests.csproj" />
+  </Folder>
+</Solution>

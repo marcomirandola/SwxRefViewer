@@ -1,0 +1,35 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build SwxRefViewer.slnx -c Release
+
+      - name: Test
+        run: dotnet test SwxRefViewer.slnx -c Release --no-build
+
+      - name: Collect files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/SwxRefViewer | Out-Null
+          Copy-Item src/SwxRefViewer/bin/Release/net48/* artifacts/SwxRefViewer -Recurse
+          Copy-Item README.md artifacts/SwxRefViewer
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SwxRefViewer-${{ github.run_number }}
+          path: artifacts/SwxRefViewer
