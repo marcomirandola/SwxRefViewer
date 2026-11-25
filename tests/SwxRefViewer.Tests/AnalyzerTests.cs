@@ -66,6 +66,35 @@ namespace SwxRefViewer.Tests
         }
 
         [Fact]
+        public void RawScan_finds_paths_in_compressed_sections()
+        {
+            var text = Encoding.Unicode.GetBytes(@"D:\Lib\Washer.sldprt");
+            byte[] compressed;
+            using (var ms = new MemoryStream())
+            {
+                using (var d = new System.IO.Compression.DeflateStream(ms, System.IO.Compression.CompressionMode.Compress, true))
+                    d.Write(text, 0, text.Length);
+                compressed = ms.ToArray();
+            }
+            var name = Encoding.ASCII.GetBytes("Config-0-ResolvedFeatures");
+            var file = new List<byte> { 9, 9, 9 };
+            file.AddRange(new byte[] { 0x14, 0, 6, 0, 8, 0 });
+            file.AddRange(BitConverter.GetBytes(compressed.Length));
+            file.AddRange(BitConverter.GetBytes(text.Length));
+            file.AddRange(BitConverter.GetBytes(name.Length));
+            file.AddRange(name);
+            file.AddRange(compressed);
+            var path = Path.Combine(root, "packed.sldasm");
+            File.WriteAllBytes(path, file.ToArray());
+
+            using (var reader = new ReferenceReader(null, true, _ => { }))
+            {
+                var refs = reader.Read(path, out _);
+                Assert.Equal(@"D:\Lib\Washer.sldprt", Assert.Single(refs).StoredPath);
+            }
+        }
+
+        [Fact]
         public void Reference_at_stored_path_is_ok()
         {
             var part = FakeFile(@"A\part.sldprt");

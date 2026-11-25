@@ -198,8 +198,105 @@ namespace SwxRefViewer
         List<StoredReference> ReadWithRawScan(string path)
         {
             var bytes = File.ReadAllBytes(path);
-            var found = new List<string>();
+            var buffers = new List<byte[]> { bytes };
+            var sections = InflateSections(bytes, buffers);
+            log(Path.GetFileName(path) + ": raw scan, " + bytes.Length + " bytes, " + sections + " compressed sections decompressed.");
 
+            var found = new List<string>();
+            foreach (var buffer in buffers)
+                ScanBuffer(buffer, found);
+
+            var self = Path.GetFullPath(path);
+            var list = found
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(p => !string.Equals(p, self, StringComparison.OrdinalIgnoreCase))
+                .Select(p => new StoredReference { StoredPath = p, Source = "Raw scan" })
+                .ToList();
+            if (list.Count == 0)
+                log(Path.GetFileName(path) + ": no paths found. File header: " + BitConverter.ToString(bytes, 0, Math.Min(16, bytes.Length)));
+            return list;
+        }
+
+        static readonly byte[] SectionMarker = { 0x14, 0x00, 0x06, 0x00, 0x08, 0x00 };
+
+        // SOLIDWORKS files store their data in named sections: marker, compressed size, uncompressed size,
+        // name length (4 bytes each), name, then a raw deflate stream. Most path strings are inside these streams.
+        // If the layout does not match, other offsets after the marker are tried.
+        static int InflateSections(byte[] bytes, List<byte[]> output)
+        {
+            int count = 0;
+            int pos = 0;
+            while ((pos = IndexOf(bytes, SectionMarker, pos)) >= 0)
+            {
+                int start = pos + SectionMarker.Length;
+                pos = start;
+                byte[] data = null;
+
+                if (start + 12 <= bytes.Length)
+                {
+                    int compressed = BitConverter.ToInt32(bytes, start);
+                    int nameLength = BitConverter.ToInt32(bytes, start + 8);
+                    if (compressed > 0 && nameLength >= 0 && nameLength < 512)
+                    {
+                        int dataStart = start + 12 + nameLength;
+                        if (dataStart < bytes.Length)
+                            data = Inflate(bytes, dataStart, Math.Min(compressed, bytes.Length - dataStart));
+                    }
+                }
+                if (data == null)
+                {
+                    // layout differs: try a few offsets after the marker
+                    for (int skip = 0; skip <= 64 && data == null && start + skip < bytes.Length; skip++)
+                        data = Inflate(bytes, start + skip, bytes.Length - start - skip);
+                }
+                if (data != null && data.Length > 0)
+                {
+                    output.Add(data);
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        static byte[] Inflate(byte[] bytes, int offset, int length)
+        {
+            try
+            {
+                using (var input = new MemoryStream(bytes, offset, length))
+                using (var deflate = new System.IO.Compression.DeflateStream(input, System.IO.Compression.CompressionMode.Decompress))
+                using (var output = new MemoryStream())
+                {
+                    var buffer = new byte[81920];
+                    int read;
+                    long total = 0;
+                    while ((read = deflate.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        output.Write(buffer, 0, read);
+                        total += read;
+                        if (total > 256L * 1024 * 1024) break;
+                    }
+                    return total > 0 ? output.ToArray() : null;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        static int IndexOf(byte[] haystack, byte[] needle, int from)
+        {
+            for (int i = from; i <= haystack.Length - needle.Length; i++)
+            {
+                int j = 0;
+                while (j < needle.Length && haystack[i + j] == needle[j]) j++;
+                if (j == needle.Length) return i;
+            }
+            return -1;
+        }
+
+        static void ScanBuffer(byte[] bytes, List<string> found)
+        {
             var utf16 = new StringBuilder();
             for (int offset = 0; offset < 2; offset++)
             {
@@ -220,13 +317,6 @@ namespace SwxRefViewer
                 else { Collect(ansi, found); ansi.Clear(); }
             }
             Collect(ansi, found);
-
-            var self = Path.GetFullPath(path);
-            return found
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Where(p => !string.Equals(p, self, StringComparison.OrdinalIgnoreCase))
-                .Select(p => new StoredReference { StoredPath = p, Source = "Raw scan" })
-                .ToList();
         }
 
         static void Collect(StringBuilder text, List<string> found)
